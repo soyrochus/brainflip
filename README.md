@@ -1,7 +1,8 @@
+# Brainflip
 
-ADD PROJECT DETAILS HERE
-
-
+Brainflip is a simple Concentration-style memory game served by a Flask
+application. Players flip over cards on a 6×6 grid, trying to match all
+pairs. The interface uses Tailwind CSS and runs entirely in the browser.
 
 ## Installation
 

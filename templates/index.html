@@ -6,17 +6,23 @@
     <title>Brainflip</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .card{perspective:1000px}
-        .card-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform 0.6s}
-        .card.flip .card-inner{transform:rotateY(180deg)}
-        .card-face{position:absolute;width:100%;height:100%;backface-visibility:hidden;border-radius:0.5rem}
-        .card-front{transform:rotateY(180deg)}
+        .card { perspective: 1000px; }
+        .card-inner {
+            position: relative; width: 100%; height: 100%;
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(.4,2.5,.6,1);
+        }
+        .card.flip .card-inner { transform: rotateY(180deg); }
+        .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 0.5rem; }
+        .card-front { transform: rotateY(180deg); }
     </style>
 </head>
 <body class="min-h-screen bg-blue-50 flex flex-col items-center py-6">
     <header class="mb-4 text-center">
         <h1 class="text-2xl font-bold text-blue-700 mb-2">Brainflip Memory Game</h1>
-        <span class="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded" id="score-badge">Score: <span id="score">0</span></span>
+        <span class="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded" id="score-badge">
+            Score: <span id="score">0</span>
+        </span>
     </header>
     <main class="flex flex-col items-center space-y-4">
         <div id="grid" class="grid grid-cols-4 gap-2 w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg" style="min-height: 320px;"></div>
@@ -26,72 +32,101 @@
         </div>
     </main>
     <script>
-        const cardImages=[
+        const cardImages = [
             '/static/images/front1.png','/static/images/front2.png','/static/images/front3.png',
             '/static/images/front4.png','/static/images/front5.png','/static/images/front6.png',
-            '/static/images/front7.png','static/images/front8.png'
+            '/static/images/front7.png','/static/images/front8.png'
         ];
-        const backImage='/static/images/back.png';
+        const backImage = '/static/images/back.png';
 
-        const grid=document.getElementById('grid');
-        const scoreEl=document.getElementById('score');
-        const winEl=document.getElementById('win');
-        const playBtn=document.getElementById('play-again');
+        const grid = document.getElementById('grid');
+        const scoreEl = document.getElementById('score');
+        const winEl = document.getElementById('win');
+        const playBtn = document.getElementById('play-again');
 
-        let first=null,second=null,lock=false,score=0;
-
-        // For 4x4 grid, need 8 pairs (16 cards)
+        let first = null, second = null, lock = false, score = 0;
         let fullCardImages = cardImages.slice(0, 8);
 
-        function shuffle(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}}
+        // Detect debug mode in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const debugMode = urlParams.get('debug') === 'true';
 
-        function createCard(src){
-            const card=document.createElement('div');
-            card.className='card bg-blue-100 rounded shadow aspect-[4/5] cursor-pointer flex items-center justify-center w-[80px] h-[100px] sm:w-[90px] sm:h-[112px] md:w-[100px] md:h-[125px]';
-            card.innerHTML=`<div class="card-inner">
-                <img src="${src}" class="card-face card-front object-contain w-full h-full"/>
-                <img src="${backImage}" class="card-face card-back object-contain w-full h-full"/>
-            </div>`;
-            card.dataset.image=src;
-            card.addEventListener('click',()=>onCardClick(card));
-            return card;
-        }
-
-        function onCardClick(card){
-            if(lock||card.classList.contains('flip')||card.classList.contains('matched'))return;
-            card.classList.add('flip');
-            if(!first){first=card;return;}
-            if(card===first)return; // same card
-            second=card;lock=true;
-            if(first.dataset.image===second.dataset.image){
-                setTimeout(()=>{
-                    first.classList.add('matched');
-                    second.classList.add('matched');
-                    score++;
-                    scoreEl.textContent=score;
-                    reset();
-                    if(score===8)showWin();
-                }, 300);
-            }else{
-                setTimeout(()=>{first.classList.remove('flip');second.classList.remove('flip');reset();},1000);
+        function shuffle(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
             }
         }
 
-        function reset(){first=null;second=null;lock=false;}
-
-        function showWin(){winEl.classList.remove('hidden');}
-
-        function init(){
-            const deck=[...fullCardImages,...fullCardImages]; // 16 cards
-            shuffle(deck);
-            grid.innerHTML='';
-            score=0;scoreEl.textContent=0;
-            winEl.classList.add('hidden');
-            deck.forEach(src=>grid.appendChild(createCard(src)));
+        function getDeck() {
+            if (debugMode) {
+                // Ordered: [A, A, B, B, ...]
+                let ordered = [];
+                for (let img of fullCardImages) {
+                    ordered.push(img, img);
+                }
+                return ordered;
+            } else {
+                // Shuffled: [A, B, ...] x2, then shuffle
+                const deck = [...fullCardImages, ...fullCardImages];
+                shuffle(deck);
+                return deck;
+            }
         }
 
-        playBtn.addEventListener('click',init);
-        document.addEventListener('DOMContentLoaded',init);
+        function createCard(src, idx) {
+            const card = document.createElement('div');
+            card.className = 'card bg-blue-100 rounded shadow aspect-[4/5] cursor-pointer flex items-center justify-center w-20 h-28 sm:w-24 sm:h-32 md:w-28 md:h-40 lg:w-32 lg:h-48 transition-transform duration-300';
+            card.innerHTML = `<div class="card-inner">
+                <img src="${src}" alt="card front" class="card-face card-front object-contain w-full h-full"/>
+                <img src="${backImage}" alt="card back" class="card-face card-back object-contain w-full h-full"/>
+            </div>`;
+            card.dataset.image = src;
+            card.tabIndex = 0; // accessibility
+            card.addEventListener('click', () => onCardClick(card));
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') onCardClick(card);
+            });
+            return card;
+        }
+
+        function onCardClick(card) {
+            if (lock || card.classList.contains('flip') || card.classList.contains('matched')) return;
+            card.classList.add('flip');
+            if (!first) { first = card; return; }
+            if (card === first) return;
+            second = card; lock = true;
+            if (first.dataset.image === second.dataset.image) {
+                setTimeout(() => {
+                    first.classList.add('matched');
+                    second.classList.add('matched');
+                    score++;
+                    scoreEl.textContent = score;
+                    reset();
+                    if (score === 8) showWin();
+                }, 300);
+            } else {
+                setTimeout(() => {
+                    first.classList.remove('flip');
+                    second.classList.remove('flip');
+                    reset();
+                }, 1000);
+            }
+        }
+
+        function reset() { first = null; second = null; lock = false; }
+        function showWin() { winEl.classList.remove('hidden'); }
+
+        function init() {
+            const deck = getDeck();
+            grid.innerHTML = '';
+            score = 0; scoreEl.textContent = 0;
+            winEl.classList.add('hidden');
+            deck.forEach((src, idx) => grid.appendChild(createCard(src, idx)));
+        }
+
+        playBtn.addEventListener('click', init);
+        document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>

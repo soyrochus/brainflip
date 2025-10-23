@@ -27,13 +27,23 @@
             </span>
         </div>
     </header>
-    <main class="flex flex-col items-center space-y-4">
-        <div id="grid" class="grid grid-cols-4 gap-2 w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg" style="min-height: 320px;"></div>
-        <div id="win" class="hidden text-center space-y-2">
-            <p class="text-xl font-semibold text-blue-700">You win!</p>
-            <button id="play-again" class="bg-blue-500 text-white px-4 py-2 rounded">Play Again</button>
-        </div>
-    </main>
+    <div class="flex justify-center gap-6 w-full max-w-6xl px-4">
+        <aside id="top-scores-container" class="hidden lg:block">
+            <div class="bg-white rounded-lg shadow-md p-3 w-40">
+                <h2 class="text-sm font-semibold text-blue-700 mb-2 text-center">Top Scores</h2>
+                <ol id="top-scores-list" class="text-xs text-gray-700 space-y-1">
+                    <li class="text-gray-400 text-center">No scores yet</li>
+                </ol>
+            </div>
+        </aside>
+        <main class="flex flex-col items-center space-y-4">
+            <div id="grid" class="grid grid-cols-4 gap-2 w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg" style="min-height: 320px;"></div>
+            <div id="win" class="hidden text-center space-y-2">
+                <p class="text-xl font-semibold text-blue-700">You win!</p>
+                <button id="play-again" class="bg-blue-500 text-white px-4 py-2 rounded">Play Again</button>
+            </div>
+        </main>
+    </div>
     <script>
         const ENABLE_HELPERS = true; // true to enable sneak peek feature
         const PEEK_DURATION_MS = 800;
@@ -51,6 +61,8 @@
         const scoreWrapper = document.getElementById('score-wrapper');
         const winEl = document.getElementById('win');
         const playBtn = document.getElementById('play-again');
+        const topScoresContainer = document.getElementById('top-scores-container');
+        const topScoresList = document.getElementById('top-scores-list');
 
         let first = null, second = null, lock = false, score = 0;
         let fullCardImages = cardImages.slice(0, 8);
@@ -115,6 +127,22 @@
             peekButton.addEventListener('click', onSneakPeek);
             scoreWrapper.appendChild(peekButton);
             updatePeekButtonState();
+        }
+
+        function setupNewGameButton() {
+            if (!scoreWrapper) return;
+            const newGameButton = document.createElement('button');
+            newGameButton.id = 'new-game';
+            newGameButton.type = 'button';
+            newGameButton.className = 'bg-green-500 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-300 focus:ring-offset-2 focus:ring-offset-blue-50 transition hover:bg-green-600';
+            newGameButton.textContent = 'New Game';
+            newGameButton.title = 'Start a new game';
+            newGameButton.addEventListener('click', onNewGame);
+            scoreWrapper.appendChild(newGameButton);
+        }
+
+        function onNewGame() {
+            init();
         }
 
         function clearPeekTimers() {
@@ -220,6 +248,57 @@
         function showWin() {
             winEl.classList.remove('hidden');
             updatePeekButtonState();
+            // Submit the score to the backend
+            submitScore(score);
+        }
+
+        async function submitScore(finalScore) {
+            try {
+                const response = await fetch('/api/scores', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ score: finalScore })
+                });
+                if (response.ok) {
+                    // Refresh top scores after submission
+                    await loadTopScores();
+                }
+            } catch (error) {
+                console.error('Failed to submit score:', error);
+            }
+        }
+
+        async function loadTopScores() {
+            try {
+                const response = await fetch('/api/scores');
+                if (response.ok) {
+                    const scores = await response.json();
+                    displayTopScores(scores);
+                }
+            } catch (error) {
+                console.error('Failed to load top scores:', error);
+            }
+        }
+
+        function displayTopScores(scores) {
+            if (!topScoresList) return;
+            
+            if (!scores || scores.length === 0) {
+                topScoresList.innerHTML = '<li class="text-gray-400 text-center">No scores yet</li>';
+                return;
+            }
+
+            topScoresList.innerHTML = scores.map((score, index) => 
+                `<li class="flex justify-between px-2 py-1 rounded hover:bg-blue-50">
+                    <span class="font-medium">${index + 1}.</span>
+                    <span>${score}</span>
+                </li>`
+            ).join('');
+            
+            // Show the container if it was hidden
+            if (topScoresContainer) {
+                topScoresContainer.classList.remove('hidden');
+            }
         }
 
         function init() {
@@ -235,9 +314,13 @@
         if (ENABLE_HELPERS) {
             setupHelpers();
         }
+        setupNewGameButton();
 
         playBtn.addEventListener('click', init);
-        document.addEventListener('DOMContentLoaded', init);
+        document.addEventListener('DOMContentLoaded', () => {
+            init();
+            loadTopScores();
+        });
     </script>
 </body>
 </html>

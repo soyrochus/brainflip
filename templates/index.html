@@ -27,23 +27,24 @@
             </span>
         </div>
     </header>
-    <div class="flex justify-center gap-6 w-full max-w-6xl px-4">
-        <aside id="top-scores-container" class="hidden lg:block">
-            <div class="bg-white rounded-lg shadow-md p-3 w-40">
-                <h2 class="text-sm font-semibold text-blue-700 mb-2 text-center">Top Scores</h2>
-                <ol id="top-scores-list" class="text-xs text-gray-700 space-y-1">
-                    <li class="text-gray-400 text-center">No scores yet</li>
-                </ol>
-            </div>
-        </aside>
-        <main class="flex flex-col items-center space-y-4">
-            <div id="grid" class="grid grid-cols-4 gap-2 w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg" style="min-height: 320px;"></div>
-            <div id="win" class="hidden text-center space-y-2">
-                <p class="text-xl font-semibold text-blue-700">You win!</p>
-                <button id="play-again" class="bg-blue-500 text-white px-4 py-2 rounded">Play Again</button>
-            </div>
-        </main>
-    </div>
+    <!-- Top scores positioned absolutely to the left -->
+    <aside id="top-scores-container" class="hidden lg:block fixed left-4 top-24 z-10">
+        <div class="bg-white rounded-lg shadow-md p-3 w-40">
+            <h2 class="text-sm font-semibold text-blue-700 mb-2 text-center">Top Scores</h2>
+            <ol id="top-scores-list" class="text-xs text-gray-700 space-y-1">
+                <li class="text-gray-400 text-center">No scores yet</li>
+            </ol>
+        </div>
+    </aside>
+    
+    <!-- Main game area centered -->
+    <main class="flex flex-col items-center space-y-4 w-full max-w-6xl px-4">
+        <div id="grid" class="grid grid-cols-4 gap-2 w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg" style="min-height: 320px;"></div>
+        <div id="win" class="hidden text-center space-y-2">
+            <p class="text-xl font-semibold text-blue-700">You win!</p>
+            <button id="play-again" class="bg-blue-500 text-white px-4 py-2 rounded">Play Again</button>
+        </div>
+    </main>
     <script>
         const ENABLE_HELPERS = true; // true to enable sneak peek feature
         const PEEK_DURATION_MS = 800;
@@ -70,6 +71,12 @@
         let peekButton = null;
         let peekRevealTimeoutId = null;
         let peekCooldownTimeoutId = null;
+        
+        // New scoring variables
+        let gameStartTime = null;
+        let lastMatchTime = null;
+        let consecutiveMatches = 0;
+        let totalAttempts = 0;
 
         // Detect debug mode in URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -215,27 +222,80 @@
 
         function onCardClick(card) {
             if (lock || interactionsFrozen || card.classList.contains('flip') || card.classList.contains('matched')) return;
+            
+            // Initialize game start time on first click
+            if (gameStartTime === null) {
+                gameStartTime = Date.now();
+                lastMatchTime = gameStartTime;
+            }
+            
             card.classList.add('flip');
             if (!first) { first = card; return; }
             if (card === first) return;
             second = card; lock = true;
+            totalAttempts++;
             updatePeekButtonState();
+            
             if (first.dataset.image === second.dataset.image) {
                 setTimeout(() => {
                     first.classList.add('matched');
                     second.classList.add('matched');
-                    score++;
+                    
+                    // Calculate score for this match
+                    const currentTime = Date.now();
+                    const timeSinceLastMatch = currentTime - lastMatchTime;
+                    const matchScore = calculateMatchScore(timeSinceLastMatch);
+                    score += matchScore;
+                    consecutiveMatches++;
+                    lastMatchTime = currentTime;
+                    
                     scoreEl.textContent = score;
                     reset();
-                    if (score === 8) showWin();
+                    if (document.querySelectorAll('.card.matched').length === 16) showWin();
                 }, 300);
             } else {
                 setTimeout(() => {
                     first.classList.remove('flip');
                     second.classList.remove('flip');
+                    
+                    // Penalty for wrong match (small, doesn't wipe out progress)
+                    const penalty = Math.max(5, Math.floor(score * 0.05)); // 5% of current score, minimum 5
+                    score = Math.max(0, score - penalty);
+                    consecutiveMatches = 0; // Reset streak
+                    
+                    scoreEl.textContent = score;
                     reset();
                 }, 1000);
             }
+        }
+
+        function calculateMatchScore(timeSinceLastMatch) {
+            // Base score for any match
+            let matchScore = 100;
+            
+            // Speed bonus: faster matches get more points
+            if (timeSinceLastMatch < 2000) { // Under 2 seconds
+                matchScore += 50;
+            } else if (timeSinceLastMatch < 4000) { // Under 4 seconds
+                matchScore += 25;
+            } else if (timeSinceLastMatch > 10000) { // Over 10 seconds
+                matchScore -= 20;
+            }
+            
+            // Consecutive match bonus
+            if (consecutiveMatches > 0) {
+                matchScore += consecutiveMatches * 10; // +10 per consecutive match
+            }
+            
+            // Efficiency bonus: fewer total attempts is better
+            const efficiency = 8 / totalAttempts; // Perfect would be 8/8 = 1.0
+            if (efficiency > 0.8) {
+                matchScore += 30; // High efficiency bonus
+            } else if (efficiency > 0.6) {
+                matchScore += 15; // Medium efficiency bonus
+            }
+            
+            return Math.floor(matchScore);
         }
 
         function reset() {
@@ -248,8 +308,43 @@
         function showWin() {
             winEl.classList.remove('hidden');
             updatePeekButtonState();
-            // Submit the score to the backend
+            
+            // Final time bonus
+            const totalGameTime = Date.now() - gameStartTime;
+            const timeBonus = calculateTimeBonus(totalGameTime);
+            score += timeBonus;
+            scoreEl.textContent = score;
+            
+            // Update win message with details
+            const winMessage = winEl.querySelector('p');
+            const minutes = Math.floor(totalGameTime / 60000);
+            const seconds = Math.floor((totalGameTime % 60000) / 1000);
+            const accuracy = Math.round((8 / totalAttempts) * 100);
+            
+            winMessage.innerHTML = `
+                🎉 You win! 🎉<br>
+                <span class="text-sm text-blue-600">
+                    Time: ${minutes}:${seconds.toString().padStart(2, '0')} | 
+                    Accuracy: ${accuracy}% | 
+                    Final Score: ${score}
+                </span>
+            `;
+            
             submitScore(score);
+        }
+
+        function calculateTimeBonus(totalTime) {
+            // Bonus for completing game quickly
+            if (totalTime < 30000) { // Under 30 seconds - amazing!
+                return 200;
+            } else if (totalTime < 60000) { // Under 1 minute - great!
+                return 100;
+            } else if (totalTime < 120000) { // Under 2 minutes - good
+                return 50;
+            } else if (totalTime < 180000) { // Under 3 minutes - okay
+                return 25;
+            }
+            return 0; // No bonus for longer times
         }
 
         async function submitScore(finalScore) {
@@ -305,7 +400,15 @@
             clearPeekTimers();
             const deck = getDeck();
             grid.innerHTML = '';
-            score = 0; scoreEl.textContent = 0;
+            score = 0; 
+            scoreEl.textContent = 0;
+            
+            // Reset scoring variables
+            gameStartTime = null;
+            lastMatchTime = null;
+            consecutiveMatches = 0;
+            totalAttempts = 0;
+            
             winEl.classList.add('hidden');
             deck.forEach((src, idx) => grid.appendChild(createCard(src, idx)));
             updatePeekButtonState();

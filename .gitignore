@@ -11,3 +11,6 @@ wheels/
 
 # MacoS system files
 .DS_Store
+
+# Game data
+scores.txt

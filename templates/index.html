@@ -21,9 +21,11 @@
 <body class="min-h-screen bg-blue-50 flex flex-col items-center py-6">
     <header class="mb-4 text-center">
         <h1 class="text-2xl font-bold text-blue-700 mb-2">Brainflip Memory Game</h1>
-        <span class="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded" id="score-badge">
-            Score: <span id="score">0</span>
-        </span>
+        <div id="score-wrapper" class="flex items-center justify-center gap-2">
+            <span class="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded" id="score-badge">
+                Score: <span id="score">0</span>
+            </span>
+        </div>
     </header>
     <main class="flex flex-col items-center space-y-4">
         <div id="grid" class="grid grid-cols-4 gap-2 w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg" style="min-height: 320px;"></div>
@@ -33,6 +35,10 @@
         </div>
     </main>
     <script>
+        const ENABLE_HELPERS = true; // true to enable sneak peek feature
+        const PEEK_DURATION_MS = 800;
+        const PEEK_COOLDOWN_MS = 2000;
+
         const cardImages = [
             '/static/images/front1.png','/static/images/front2.png','/static/images/front3.png',
             '/static/images/front4.png','/static/images/front5.png','/static/images/front6.png',
@@ -42,11 +48,16 @@
 
         const grid = document.getElementById('grid');
         const scoreEl = document.getElementById('score');
+        const scoreWrapper = document.getElementById('score-wrapper');
         const winEl = document.getElementById('win');
         const playBtn = document.getElementById('play-again');
 
         let first = null, second = null, lock = false, score = 0;
         let fullCardImages = cardImages.slice(0, 8);
+        let interactionsFrozen = false;
+        let peekButton = null;
+        let peekRevealTimeoutId = null;
+        let peekCooldownTimeoutId = null;
 
         // Detect debug mode in URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -91,12 +102,96 @@
             return card;
         }
 
+        function setupHelpers() {
+            if (!ENABLE_HELPERS || !scoreWrapper || peekButton) return;
+            peekButton = document.createElement('button');
+            peekButton.id = 'sneak-peek';
+            peekButton.type = 'button';
+            peekButton.className = 'bg-blue-500 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2 focus:ring-offset-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition';
+            peekButton.textContent = 'Sneak Peek';
+            peekButton.title = 'Reveal all cards briefly';
+            peekButton.setAttribute('aria-controls', 'grid');
+            peekButton.setAttribute('aria-disabled', 'true');
+            peekButton.addEventListener('click', onSneakPeek);
+            scoreWrapper.appendChild(peekButton);
+            updatePeekButtonState();
+        }
+
+        function clearPeekTimers() {
+            if (peekRevealTimeoutId) {
+                window.clearTimeout(peekRevealTimeoutId);
+                peekRevealTimeoutId = null;
+            }
+            if (peekCooldownTimeoutId) {
+                window.clearTimeout(peekCooldownTimeoutId);
+                peekCooldownTimeoutId = null;
+            }
+            grid.querySelectorAll('.card.peek-preview').forEach(card => {
+                card.classList.remove('peek-preview');
+                card.classList.remove('flip');
+            });
+            interactionsFrozen = false;
+        }
+
+        function getFaceDownCards() {
+            return Array.from(grid.querySelectorAll('.card')).filter(card => !card.classList.contains('matched') && !card.classList.contains('flip'));
+        }
+
+        function startPeekCooldown() {
+            if (!peekButton) return;
+            if (peekCooldownTimeoutId) window.clearTimeout(peekCooldownTimeoutId);
+            peekCooldownTimeoutId = window.setTimeout(() => {
+                peekCooldownTimeoutId = null;
+                updatePeekButtonState();
+            }, PEEK_COOLDOWN_MS);
+            updatePeekButtonState();
+        }
+
+        function updatePeekButtonState() {
+            if (!peekButton) return;
+            const hasFaceDownCards = getFaceDownCards().length > 0;
+            const peekInProgress = interactionsFrozen || peekRevealTimeoutId !== null;
+            const cooldownActive = peekCooldownTimeoutId !== null;
+            const shouldDisable = !hasFaceDownCards || peekInProgress || cooldownActive || lock;
+            peekButton.disabled = shouldDisable;
+            peekButton.setAttribute('aria-disabled', shouldDisable ? 'true' : 'false');
+        }
+
+        function onSneakPeek() {
+            if (!peekButton || peekButton.disabled) return;
+            const cardsToRehide = getFaceDownCards();
+            if (!cardsToRehide.length) {
+                updatePeekButtonState();
+                return;
+            }
+            const restoreFocus = document.activeElement === peekButton;
+            interactionsFrozen = true;
+            updatePeekButtonState();
+            cardsToRehide.forEach(card => {
+                card.classList.add('flip');
+                card.classList.add('peek-preview');
+            });
+            peekRevealTimeoutId = window.setTimeout(() => {
+                cardsToRehide.forEach(card => {
+                    card.classList.remove('flip');
+                    card.classList.remove('peek-preview');
+                });
+                interactionsFrozen = false;
+                peekRevealTimeoutId = null;
+                startPeekCooldown();
+                if (restoreFocus) {
+                    peekButton.focus({ preventScroll: true });
+                }
+            }, PEEK_DURATION_MS);
+        }
+
         function onCardClick(card) {
-            if (lock || card.classList.contains('flip') || card.classList.contains('matched')) return;
+            if (lock || interactionsFrozen || card.classList.contains('flip') || card.classList.contains('matched')) return;
             card.classList.add('flip');
             if (!first) { first = card; return; }
             if (card === first) return;
             second = card; lock = true;
+            updatePeekButtonState();
             if (first.dataset.image === second.dataset.image) {
                 setTimeout(() => {
                     first.classList.add('matched');
@@ -115,15 +210,30 @@
             }
         }
 
-        function reset() { first = null; second = null; lock = false; }
-        function showWin() { winEl.classList.remove('hidden'); }
+        function reset() {
+            first = null;
+            second = null;
+            lock = false;
+            updatePeekButtonState();
+        }
+
+        function showWin() {
+            winEl.classList.remove('hidden');
+            updatePeekButtonState();
+        }
 
         function init() {
+            clearPeekTimers();
             const deck = getDeck();
             grid.innerHTML = '';
             score = 0; scoreEl.textContent = 0;
             winEl.classList.add('hidden');
             deck.forEach((src, idx) => grid.appendChild(createCard(src, idx)));
+            updatePeekButtonState();
+        }
+
+        if (ENABLE_HELPERS) {
+            setupHelpers();
         }
 
         playBtn.addEventListener('click', init);

@@ -1,0 +1,18 @@
+{
+  "name": "brainflip",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Node/Express backend scaffold for Brainflip migration",
+  "scripts": {
+    "start": "node server/app.js",
+    "dev": "nodemon server/app.js",
+    "test": "node --version"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}

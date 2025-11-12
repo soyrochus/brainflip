@@ -3,16 +3,19 @@ import { loadScores, saveScore } from '../services/scoresService.js';
 
 const router = Router();
 
-router.get('/', (req, res) => {
+router.get('/', (req, res, next) => {
   try {
     const scores = loadScores();
     res.json(scores);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to load scores' });
+  } catch (error) {
+    const wrapped = new Error('Failed to load scores');
+    wrapped.cause = error;
+    wrapped.status = 500;
+    next(wrapped);
   }
 });
 
-router.post('/', (req, res) => {
+router.post('/', (req, res, next) => {
   const { score } = req.body || {};
   if (score === undefined) {
     return res.status(400).json({ error: 'Score is required' });
@@ -26,9 +29,12 @@ router.post('/', (req, res) => {
   }
   try {
     const topScores = saveScore(n);
-    res.json({ success: true, top_scores: topScores });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to save score' });
+    return res.json({ success: true, top_scores: topScores });
+  } catch (error) {
+    const wrapped = new Error('Failed to save score');
+    wrapped.cause = error;
+    wrapped.status = 500;
+    return next(wrapped);
   }
 });
 

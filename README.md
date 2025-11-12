@@ -1,6 +1,6 @@
 # Brainflip
 
-Brainflip is a classic Concentration-style memory game built with Flask and vanilla JavaScript. Players flip cards on a 4×4 grid to find matching pairs, testing their memory and concentration skills. The game features a clean, responsive interface built with Tailwind CSS that works on desktop and mobile devices.
+Brainflip is a classic Concentration-style memory game powered by Node.js (Express) on the backend and vanilla JavaScript on the frontend. Players flip cards on a 4×4 grid to find matching pairs, testing their memory and concentration skills. The game features a clean, responsive interface built with Tailwind CSS that works on desktop and mobile devices. A legacy Flask server still lives in the repo for reference, but the Node runtime is the supported path forward.
 
 <img src="brainflip.png" width="500" height="500" />
 
@@ -29,7 +29,7 @@ The game includes an optional "Sneak Peek" helper that adds a button next to the
 
 To enable the Sneak Peek feature:
 
-1. Open the file `templates/index.html`
+1. Open the file `public/index.html`
 2. Find the line near the top of the `<script>` section:
    ```javascript
    const ENABLE_HELPERS = false;
@@ -55,51 +55,46 @@ To enable the Sneak Peek feature:
 
 ### Customizing Sneak Peek Timing
 
-You can adjust the timing by modifying these constants in `templates/index.html`:
+You can adjust the timing by modifying these constants in `public/index.html`:
 
 ```javascript
 const PEEK_DURATION_MS = 800;    // How long cards stay revealed (milliseconds)
 const PEEK_COOLDOWN_MS = 2000;   // Cooldown between uses (milliseconds)
 ```
 
-## Installation
+## Local Development
 
-1. **Clone the repository:**
+### Node.js server (default)
 
-   ```bash
-   git clone <repo-url>
-   cd brainflip
-   ```
-
-2. **Install dependencies using [uv](https://github.com/astral-sh/uv):**
+1. **Install dependencies**
 
    ```bash
-   uv sync
+   npm install
    ```
 
-3. **Activate the virtual environment:**
-
-   * **Linux/Mac:**
-
-     ```bash
-     source .venv/bin/activate
-     ```
-   * **Windows (cmd):**
-
-     ```cmd
-     .venv\Scripts\activate.bat
-     ```
-   * **Windows (PowerShell):**
-
-     ```powershell
-     .venv\Scripts\Activate.ps1
-     ```
-
-4. **Run the application:**
+2. **Start the server**
 
    ```bash
-   python -m main.py
+   npm run dev      # reloads on change
+   # or
+   npm run start    # production-style server
    ```
+
+3. **Play the game**
+
+   Open <http://localhost:8000>. Express serves everything under `/public`, and the JSON APIs live under `/api/scores`.
+
+### Legacy Flask server (optional)
+
+If you still need the historical Python server, you can run it with the shared assets:
+
+```bash
+uv sync
+source .venv/bin/activate   # or the Windows equivalent
+python -m main.py
+```
+
+Both runtimes persist scores to the same file (`server/storage/scores.txt`), so you can bounce between them without losing data.
 
 
 ## License and Copyright
@@ -107,6 +102,3 @@ const PEEK_COOLDOWN_MS = 2000;   // Cooldown between uses (milliseconds)
 Copyright © 2025, Iwan van der Kleijn
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-
-

@@ -1,13 +1,20 @@
 # Brainflip - A simple web-based game - Copyright (c) 2025 - licence: MIT
 
-from flask import Flask, render_template, request, jsonify
-import json
+from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
 
-app = Flask(__name__)
-
-SCORES_FILE = 'scores.txt'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PUBLIC_DIR = os.path.join(BASE_DIR, 'public')
+SCORES_FILE = os.path.join(BASE_DIR, 'server', 'storage', 'scores.txt')
 MAX_TOP_SCORES = 5
+
+os.makedirs(os.path.dirname(SCORES_FILE), exist_ok=True)
+
+app = Flask(
+    __name__,
+    static_folder=PUBLIC_DIR,
+    template_folder=PUBLIC_DIR
+)
 
 def load_scores():
     """Load scores from file, return list of integers in descending order."""
@@ -36,6 +43,10 @@ def save_scores(scores):
 @app.route('/')
 def serve_game():
     return render_template('index.html')
+
+@app.route('/images/<path:filename>')
+def serve_images(filename: str):
+    return send_from_directory(os.path.join(PUBLIC_DIR, 'images'), filename)
 
 @app.route('/api/scores', methods=['GET'])
 def get_scores():

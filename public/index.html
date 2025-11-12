@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="/static/images/favicon.png">
+    <link rel="icon" type="image/png" href="/images/favicon.png">
     <title>Brainflip</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -46,16 +46,16 @@
         </div>
     </main>
     <script>
-        const ENABLE_HELPERS = true; // true to enable sneak peek feature
+        const ENABLE_HELPERS = true; // toggle helpers without touching the rest of the UI
         const PEEK_DURATION_MS = 800;
         const PEEK_COOLDOWN_MS = 2000;
 
         const cardImages = [
-            '/static/images/front1.png','/static/images/front2.png','/static/images/front3.png',
-            '/static/images/front4.png','/static/images/front5.png','/static/images/front6.png',
-            '/static/images/front7.png','/static/images/front8.png'
+            '/images/front1.png','/images/front2.png','/images/front3.png',
+            '/images/front4.png','/images/front5.png','/images/front6.png',
+            '/images/front7.png','/images/front8.png'
         ];
-        const backImage = '/static/images/back.png';
+        const backImage = '/images/back.png';
 
         const grid = document.getElementById('grid');
         const scoreEl = document.getElementById('score');

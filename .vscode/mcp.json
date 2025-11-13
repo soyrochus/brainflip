@@ -1,0 +1,19 @@
+{
+	"servers": {
+		"github": {
+			"type": "http",
+			"url": "https://api.githubcopilot.com/mcp/"
+		},
+		"atlassian-mcp": {
+			"url": "https://mcp.atlassian.com/v1/sse",
+			"type": "http"
+		},
+		"playwright": {
+    	  	"command": "npx",
+     	  	"args": [
+     		   "@playwright/mcp@latest"
+     	  	]
+    	}
+	},
+	"inputs": []
+}

@@ -1,6 +1,21 @@
 # Brainflip
 
-Brainflip is a classic Concentration-style memory game powered by Node.js (Express) on the backend and vanilla JavaScript on the frontend. Players flip cards on a 4×4 grid to find matching pairs, testing their memory and concentration skills. The game features a clean, responsive interface built with Tailwind CSS that works on desktop and mobile devices. A legacy Flask server still lives in the repo for reference, but the Node runtime is the supported path forward.
+Brainflip is a classic Concentration-style memory game with both Node.js (Express) and Python (Flask) backend implementations. Players flip cards on a 4×4 grid to find matching pairs, testing their memory and concentration skills. The game features a clean, responsive interface built with Tailwind CSS that works on desktop and mobile devices.
+
+## Architecture
+
+The project provides **two backend implementations** that share the same frontend and score persistence:
+
+- **Node.js/Express** (recommended): Modern JavaScript runtime with Express framework serving static files and REST APIs
+- **Python/Flask** (legacy): Alternative Python-based server implementation
+
+Both servers:
+- Serve the same frontend assets from the `public/` directory
+- Use the same score storage file (`server/storage/scores.txt`)
+- Provide identical REST API endpoints for score management
+- Run on port 8000 by default
+
+This dual-implementation approach makes the project ideal for demonstrating multi-language backend development and for developers comfortable with either ecosystem.
 
 <img src="brainflip.png" width="500" height="500" />
 
@@ -95,6 +110,83 @@ python -m main.py
 ```
 
 Both runtimes persist scores to the same file (`server/storage/scores.txt`), so you can bounce between them without losing data.
+
+## Testing with Playwright
+
+The project includes comprehensive end-to-end tests using Playwright, a modern browser automation framework. The tests validate the core card-matching gameplay mechanics across multiple browsers (Chromium, Firefox, and WebKit).
+
+### Running Tests
+
+```bash
+# Run all tests
+npx playwright test
+
+# Run tests in UI mode (interactive)
+npx playwright test --ui
+
+# Run tests in a specific browser
+npx playwright test --project=chromium
+
+# View last test report
+npx playwright show-report
+```
+
+### Test Coverage
+
+The test suite (`tests/card-matching.spec.ts`) includes:
+
+- **Mismatch Test**: Verifies that two different cards flip back to face-down after the comparison animation
+- **Match Test**: Confirms that two identical cards stay face-up in the "matched" state once found
+- **Dynamic Card Discovery**: Tests intelligently loop through random card positions to find mismatches and matches, rather than hard-coding positions
+
+The tests use DOM inspection to identify card states based on CSS classes (`.flip`, `.matched`) and data attributes (`data-image`).
+
+### Playwright Configuration
+
+The project is configured to:
+- Automatically start the Node.js server before running tests
+- Run tests in parallel across multiple browsers
+- Capture traces on first retry for debugging
+- Generate HTML reports with screenshots and videos
+
+See `playwright.config.ts` for full configuration details.
+
+## Model Context Protocol (MCP) Integration
+
+This project leverages three MCP servers to enhance the development workflow in VS Code with GitHub Copilot:
+
+### Configured MCP Servers
+
+1. **GitHub MCP** (`github`)
+   - Provides access to GitHub repositories, issues, pull requests, and code search
+   - Enables AI-assisted code reviews and repository exploration
+   - URL: `https://api.githubcopilot.com/mcp/`
+
+2. **Atlassian MCP** (`atlassian-mcp`)
+   - Integrates with Atlassian services (Jira, Confluence, etc.)
+   - Allows querying project management and documentation
+   - URL: `https://mcp.atlassian.com/v1/sse`
+
+3. **Playwright MCP** (`playwright`)
+   - Enables browser automation and testing capabilities directly from the AI assistant
+   - Used for generating and running end-to-end tests
+   - Command: `npx @playwright/mcp@latest`
+
+### Using MCP
+
+The MCP configuration (`.vscode/mcp.json`) enables GitHub Copilot to:
+- Inspect web pages and DOM elements using Playwright
+- Generate test code based on actual browser interactions
+- Access repository context and documentation
+- Integrate with project management tools
+
+This allows for AI-assisted test generation, browser debugging, and comprehensive project understanding without leaving the IDE.
+
+## Principles of Participation
+
+Everyone is invited and welcome to contribute: open issues, propose pull requests, share ideas, or help improve documentation. Participation is open to all, regardless of background or viewpoint.
+
+This project follows the [FOSS Pluralism Manifesto](./FOSS_PLURALISM_MANIFESTO.md), which affirms respect for people, freedom to critique ideas, and space for diverse perspectives.
 
 
 ## License and Copyright

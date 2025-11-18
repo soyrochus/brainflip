@@ -16,6 +16,37 @@
         .card.flip .card-inner { transform: rotateY(180deg); }
         .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 0.5rem; }
         .card-front { transform: rotateY(180deg); }
+
+        /* Flop: small celebratory tilt for matched cards */
+        @keyframes flopAnim {
+            0% { transform: rotateY(180deg) translateY(0) scale(1); }
+            30% { transform: rotateY(180deg) translateY(-8px) scale(1.06); }
+            60% { transform: rotateY(180deg) translateY(2px) scale(0.98); }
+            100% { transform: rotateY(180deg) translateY(0) scale(1); }
+        }
+        .card.flop .card-inner {
+            animation: flopAnim 360ms cubic-bezier(.2,.9,.3,1) both;
+        }
+
+        /* Backflip: dramatic flip-back animation for mismatched cards */
+        @keyframes backflipAnim {
+            0%   { transform: rotateY(180deg) rotateX(0deg) translateY(0) scale(1); opacity:1; }
+            45%  { transform: rotateY(230deg) rotateX(160deg) translateY(-18px) scale(1.04); opacity:1; }
+            85%  { transform: rotateY(200deg) rotateX(300deg) translateY(-6px) scale(0.98); opacity:1; }
+            100% { transform: rotateY(0deg)   rotateX(360deg) translateY(0) scale(1); opacity:1; }
+        }
+        /* Apply backflip while preserving the visual starting point (card still has .flip)
+           The animation runs on the inner element which already sits at rotateY(180deg). */
+        .card.backflip .card-inner {
+            animation: backflipAnim 700ms cubic-bezier(.25,.9,.25,1) both;
+        }
+
+        /* Accessibility: reduce motion support */
+        @media (prefers-reduced-motion: reduce) {
+            .card-inner { transition: none !important; }
+            .card.flop .card-inner,
+            .card.backflip .card-inner { animation: none !important; }
+        }
     </style>
 </head>
 <body class="min-h-screen bg-blue-50 flex flex-col items-center py-6">
@@ -237,10 +268,24 @@
             updatePeekButtonState();
             
             if (first.dataset.image === second.dataset.image) {
+                // Match: add matched state and a brief "flop" highlight animation
                 setTimeout(() => {
                     first.classList.add('matched');
                     second.classList.add('matched');
-                    
+                    first.classList.add('flop');
+                    second.classList.add('flop');
+
+                    const removeFlop = (card) => {
+                        const inner = card.querySelector('.card-inner');
+                        const onEnd = () => {
+                            card.classList.remove('flop');
+                            inner.removeEventListener('animationend', onEnd);
+                        };
+                        inner.addEventListener('animationend', onEnd);
+                    };
+                    removeFlop(first);
+                    removeFlop(second);
+
                     // Calculate score for this match
                     const currentTime = Date.now();
                     const timeSinceLastMatch = currentTime - lastMatchTime;
@@ -248,23 +293,37 @@
                     score += matchScore;
                     consecutiveMatches++;
                     lastMatchTime = currentTime;
-                    
+
                     scoreEl.textContent = score;
                     reset();
                     if (document.querySelectorAll('.card.matched').length === 16) showWin();
                 }, 300);
             } else {
+                // Mismatch: perform a "backflip" animation from face-up back to face-down
                 setTimeout(() => {
-                    first.classList.remove('flip');
-                    second.classList.remove('flip');
-                    
-                    // Penalty for wrong match (small, doesn't wipe out progress)
-                    const penalty = Math.max(5, Math.floor(score * 0.05)); // 5% of current score, minimum 5
-                    score = Math.max(0, score - penalty);
-                    consecutiveMatches = 0; // Reset streak
-                    
-                    scoreEl.textContent = score;
-                    reset();
+                    const applyBackflip = (card) => new Promise(resolve => {
+                        // ensure 'flip' is present so the animation starts from face-up
+                        card.classList.add('backflip');
+                        const inner = card.querySelector('.card-inner');
+                        const onEnd = () => {
+                            // cleanup: remove both flip and backflip so card is face-down
+                            card.classList.remove('flip');
+                            card.classList.remove('backflip');
+                            inner.removeEventListener('animationend', onEnd);
+                            resolve(card);
+                        };
+                        inner.addEventListener('animationend', onEnd);
+                    });
+
+                    Promise.all([applyBackflip(first), applyBackflip(second)]).then(() => {
+                        // Penalty for wrong match (small, doesn't wipe out progress)
+                        const penalty = Math.max(5, Math.floor(score * 0.05)); // 5% of current score, minimum 5
+                        score = Math.max(0, score - penalty);
+                        consecutiveMatches = 0; // Reset streak
+
+                        scoreEl.textContent = score;
+                        reset();
+                    });
                 }, 1000);
             }
         }

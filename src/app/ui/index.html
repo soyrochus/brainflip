@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'none'; script-src 'self'; style-src 'self'; img-src data:; connect-src 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'"
+  >
+  <title>Brainflip</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="header">
+    <h1 class="title">Brainflip Memory Game</h1>
+    <div id="score-wrapper" class="score-wrapper">
+      <span class="score-badge" id="score-badge">Score: <span id="score">0</span></span>
+    </div>
+  </header>
+
+  <aside id="top-scores-container" class="top-scores" hidden>
+    <h2 class="top-scores-title">Top Scores</h2>
+    <ol id="top-scores-list" class="top-scores-list">
+      <li class="top-scores-empty">No scores yet</li>
+    </ol>
+  </aside>
+
+  <main class="game">
+    <div id="grid" class="grid"></div>
+    <div id="win" class="win" hidden>
+      <p class="win-message">You win!</p>
+      <button id="play-again" class="button button-primary" type="button">Play Again</button>
+    </div>
+  </main>
+
+  <script type="module" src="./app.ts"></script>
+</body>
+</html>

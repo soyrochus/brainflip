@@ -1,0 +1,69 @@
+# Release verification record
+
+Originally verified on 27 August 2026; the native-extension additions below were verified on 28 August 2026. The file-explorer record remains the cross-platform template acceptance, and `native-probe` records the new application-owned Rust path.
+
+## Support matrix
+
+| Target | Verified environment | Native WebView | Result |
+| --- | --- | --- | --- |
+| macOS arm64 | macOS 26.5.2, Apple Silicon, Bun 1.4.0 for build | System WKWebView | Pass |
+| Linux x64 | Ubuntu 26.04, native Wayland, Bun 1.4.0 for build | GTK 3 and WebKitGTK 4.1 | Pass |
+
+The macOS executable declares macOS 13.0 as its minimum deployment version. Ubuntu 26.04 x64 is the initial supported Linux distribution; other distributions are not yet in the verified matrix.
+
+## Manual acceptance
+
+The following journey passed on both targets:
+
+- launch one 1200-by-760 native window and resize it down to the 800-by-500 minimum;
+- navigate from the sidebar and with Back, Forward, parent, row activation, and platform keyboard shortcuts;
+- toggle hidden entries and operate the pane separators with pointer and keyboard;
+- preview a directory, bounded text, a supported image, and an unsupported file;
+- follow live light/dark system appearance;
+- recover from removed items or locations and permission-denied paths without exiting or escalating privileges;
+- close during normal use without writing application state.
+
+## Artifact and isolated-runtime acceptance
+
+### Linux x64
+
+The prior Ubuntu verification identified `dist/crumb-linux-x64` as an x86-64 ELF executable. `ldd` reported no missing dependency for the packaged native addon; its direct supported runtime packages are `libgtk-3-0t64`, `libwebkit2gtk-4.1-0`, and `libjavascriptcoregtk-4.1-0`, with their normal Ubuntu dependencies. The executable was copied alone to an empty `/tmp` directory and launched with its embedded UI and native addon. It did not resolve Bun, Node.js, npm, source, or adjacent application assets and it remained on the native Wayland backend.
+
+### macOS arm64
+
+`file dist/crumb-macos-arm64` reported `Mach-O 64-bit executable arm64`. `otool -L` reported only Apple `/usr/lib` dependencies for the outer executable; the embedded native addon links only Apple system frameworks and libraries, including WebKit and AppKit. The approximately 62-MiB executable was copied alone to `/tmp/crumb-macos-readme-check`, launched from there, exercised, and closed. It did not resolve Bun, Node.js, npm, source, or adjacent application assets. Runtime application code performs no network operation and the WebView CSP blocks connections.
+
+The `native-probe` application was built on macOS arm64, copied into an otherwise empty temporary runtime location, and its host operation returned `nativeProbeAnswer: 42`. The relocated process then closed cleanly. `otool -L` on the embedded probe reported its sanitized `@rpath/probe.node` identifier and `/usr/lib/libSystem.B.dylib`, with no non-system dependency. `strings` found no repository or Cargo target path in the executable.
+
+The same fixture was built on Linux x64 and copied by itself into an otherwise empty temporary runtime location. Its host operation returned `platform: linux` and `nativeProbeAnswer: 42`. `ldd` reported only the system ELF loader, libc, and libgcc for the probe, with no non-system dependency.
+
+The clean extension compile took 2.12 seconds; an incremental forced compile took 0.61 seconds; a verified warm-cache lookup took 1.4 milliseconds. The host had Rust 1.97.1, Cargo 1.97.1, and Apple Command Line Tools supplying `cc`, the macOS SDK, `install_name_tool`, and `otool`. TypeScript-only builds invoked no Cargo extension build.
+
+### Activity monitor
+
+The Rust-backed `activity-monitor` application was implemented and checked first on Linux x64. Its `system-monitor` addon returned a real snapshot, a whole process list, and per-process details through Bun; an exited or absent process returned no details rather than failing the sample. The optimized addon reports only `libgcc_s`, libc, the ELF loader, and `linux-vdso`, with no non-system dynamic dependency. Its maximum referenced glibc symbol version is `GLIBC_2.34`, matching the existing native binding baseline.
+
+The first optimized extension compile with `sysinfo` and `napi-rs` took 8.2 seconds on the implementation host. A verified warm-cache lookup took 2.2 milliseconds, followed by a 0.18-second selected-application build. `dist/activity-monitor-linux-x64` is an 82-MiB x86-64 ELF executable. It was copied alone to an otherwise empty temporary directory and launched successfully on native Wayland for the bounded relocation check.
+
+On macOS arm64, the addon is an arm64 Mach-O Node-API library with the sanitized `@rpath/system-monitor.node` install name. It links only Apple IOKit and CoreFoundation frameworks plus `/usr/lib/libiconv.2.dylib` and `/usr/lib/libSystem.B.dylib`; it declares macOS 11.0 as its minimum, below Crumb's macOS 13.0 baseline. The addon supplied overall CPU, total and used memory, process count, 1/5/15-minute load, and per-process CPU, memory, state, parent PID, executable path, start time, and runtime. Optional fields remain explicit for permission failures and disappearing processes.
+
+`dist/activity-monitor-macos-arm64` is a 63-MiB arm64 Mach-O executable with the addon embedded. Copied by itself to an otherwise empty temporary directory, it displayed a real system snapshot and a populated process list, including its own relocated process. Its first dependency-fetching extension compile took 11.14 seconds. With dependency sources cached and both extension target directories removed, a clean build of all four registered applications took 7.90 seconds, including 6.32 seconds for the activity-monitor native compile; a warm extension lookup took 1.5 milliseconds and the selected-application build took 0.17 seconds.
+
+## Automated verification
+
+The pre-extension `bun test`, `bun run typecheck`, and `bun run verify:readonly` acceptance passed on macOS arm64 and Ubuntu Linux x64. With the activity monitor included, the Linux suite had 98 passing tests and 234 expectations; the current macOS suite has 116 passing tests and 296 expectations after the separate agent-skills additions. Strict typechecking and the unchanged file-explorer read-only scan pass. The activity monitor additionally has three passing Rust tests, including the exited-process case, and passes `cargo clippy` with warnings denied on both platforms. Filesystem and native-cache fixtures are created below the operating-system temporary directory and removed after every test; production and user-owned paths are not modified.
+
+The Linux performance acceptance remained within its bounds: 153-ms UI startup, 18-ms 5,000-row DOM commit, 15.7-ms ordinary listing, 5.3-ms text preview, 12.1-ms image preview, and no measurable retained RSS after the superseded payload check.
+
+`bun run verify:performance` passed on the verified macOS host with these measurements:
+
+| Check | Result | Limit |
+| --- | ---: | ---: |
+| Production UI startup | 129 ms | 5,000 ms |
+| Production-styled 5,000-row DOM commit | 5 ms | 2,000 ms |
+| 250-entry host listing | 16.3 ms | 5,000 ms |
+| Bounded 1-MiB text preview | 1.2 ms | 3,000 ms |
+| Bounded 8-MiB image preview | 2.0 ms | 3,000 ms |
+| RSS retained after superseded payload release | 0.1 MiB | 256 MiB |
+
+The performance command creates all data below the operating-system temporary directory, briefly opens a native verification window, closes it automatically, and removes its fixture directory.
